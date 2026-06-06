@@ -2,6 +2,17 @@
   "version": 1,
   "project": "mahdighandi1989/Detective-1",
   "watched_id": "da869845-ceca-4630-a640-722ae9a7842d",
-  "total": 0,
-  "tasks": []
+  "total": 1,
+  "tasks": [
+    {
+      "task_id": "43a3caee-fda1-4fa1-8075-35994cb49ac4",
+      "title": "بررسی و به‌روزرسانی وابستگی‌های پروژه برای آسیب‌پذیری‌های امنیتی",
+      "priority": "critical",
+      "execution_priority": 1300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-43a3caee-fda1-4fa1-8075-35994cb49ac4.md",
+      "external_attempts": 0
+    }
+  ]
 }
