@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/Detective-1",
   "watched_id": "da869845-ceca-4630-a640-722ae9a7842d",
-  "total": 1,
+  "total": 2,
   "tasks": [
     {
       "task_id": "43a3caee-fda1-4fa1-8075-35994cb49ac4",
@@ -12,6 +12,16 @@
       "status": "awaiting_review",
       "external_status": "pending",
       "path": "prompt/task-43a3caee-fda1-4fa1-8075-35994cb49ac4.md",
+      "external_attempts": 0
+    },
+    {
+      "task_id": "9cba6076-eb39-4987-a2b9-22208374dd5c",
+      "title": "پیکربندی امن اسرار از متغیرهای محیطی",
+      "priority": "critical",
+      "execution_priority": 1300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-9cba6076-eb39-4987-a2b9-22208374dd5c.md",
       "external_attempts": 0
     }
   ]
