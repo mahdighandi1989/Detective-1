@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: da869845-ceca-4630-a640-722ae9a7842d
 project: mahdighandi1989/Detective-1
 created_at: '2026-06-06T17:39:29.003928+00:00'
-updated_at: '2026-06-06T17:39:29.003931+00:00'
+updated_at: '2026-06-06T17:51:58.083871+00:00'
 target_files:
 - backend/app/api/routes/risk_assessment.py
 - backend/app/api/routes/sources.py
@@ -478,10 +478,10 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. New test files `backend/tests/test_risk_assessment.py` and `backend/tests/test_sources.py` are created.
-2. Each new test file contains integration tests covering at least the primary GET, POST, PUT, and DELETE operations for their respective resources.
-3. Tests verify correct HTTP status codes (e.g., 200, 201, 400, 404, 403), response data structure, and error handling.
-4. All new tests pass successfully.
+1. New test files `backend/tests/test_risk_assessment.py` and `backend/tests/test_sources.py` are created. _(verify: static)_
+2. Each new test file contains integration tests covering at least the primary GET, POST, PUT, and DELETE operations for their respective resources. _(verify: static)_
+3. Tests verify correct HTTP status codes (e.g., 200, 201, 400, 404, 403), response data structure, and error handling. _(verify: static)_
+4. All new tests pass successfully. _(verify: backend_test)_
 
 ## Task Steps
 
