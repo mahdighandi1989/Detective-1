@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: da869845-ceca-4630-a640-722ae9a7842d
 project: mahdighandi1989/Detective-1
 created_at: '2026-06-06T17:37:04.890448+00:00'
-updated_at: '2026-06-06T17:37:04.890450+00:00'
+updated_at: '2026-06-06T17:48:51.984525+00:00'
 target_files:
 - backend/app/core/config.py
 - backend/app/core/security.py
@@ -482,6 +482,6 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. همه مقادیر پیکربندی حساس از متغیرهای محیطی بارگذاری می‌شوند.
-2. هیچ secret hardcoded در فایل‌های کد منبع وجود ندارد.
-3. `backend/.env.example` جامع و به‌روز است.
+1. همه مقادیر پیکربندی حساس از متغیرهای محیطی بارگذاری می‌شوند. _(verify: static)_
+2. هیچ secret hardcoded در فایل‌های کد منبع وجود ندارد. _(verify: static)_
+3. `backend/.env.example` جامع و به‌روز است. _(verify: static)_
