@@ -13,8 +13,12 @@ COPY package.json package-lock.json ./
 # `npm ci` is preferred in CI/CD environments for consistent builds based on package-lock.json.
 # `--prefer-offline` uses cached packages if available.
 # `--no-audit` skips security audit to speed up installation.
-# `--omit=dev` prevents installation of devDependencies, reducing image size.
-RUN npm ci --prefer-offline --no-audit --omit=dev
+# NOTE: devDependencies (typescript, tailwindcss, postcss, autoprefixer,
+# @types/*) are REQUIRED by `next build`, so we must NOT pass `--omit=dev`
+# here. The final runtime image stays small regardless because the runner
+# stage only copies the standalone output (.next/standalone), not this build
+# stage's node_modules.
+RUN npm ci --prefer-offline --no-audit
 
 # Copy the rest of the application source code
 COPY . .
