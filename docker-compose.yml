@@ -1,0 +1,247 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: detective1-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-detective}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-detective_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-detective1}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-detective} -d ${POSTGRES_DB:-detective1}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - detective-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: detective1-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - detective-net
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: detective1-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-neo4j_pass}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - detective-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: detective1-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000" # API endpoint
+      - "${MINIO_CONSOLE_PORT:-9001}:9001" # Console UI
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - detective-net
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: detective1-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333" # REST API
+      - "${QDRANT_GRPC_PORT:-6334}:6334" # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - detective-net
+
+  backend:
+    build:
+      context: ./backend # Assumes backend Dockerfile is in ./backend/Dockerfile
+      dockerfile: Dockerfile
+    container_name: detective1-backend
+    restart: unless-stopped
+    env_file:
+      - .env # Load environment variables from .env file
+    environment:
+      # Explicitly define hostnames for inter-service communication
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      NEO4J_HOST: neo4j
+      QDRANT_HOST: qdrant
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-detective-bucket}
+      # LLM API Keys and provider
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai} # e.g., openai, perplexity, gemini
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # JWT Secret for authentication
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY} # Must be strong and set in .env
+      # Other backend specific settings, e.g., logging, environment
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"] # Assumes a health endpoint
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - detective-net
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: detective1-celery-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      NEO4J_HOST: neo4j
+      QDRANT_HOST: qdrant
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-detective-bucket}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    command: celery -A app.workers.celery_app worker -l info --concurrency=1 # Adjust concurrency as needed
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - detective-net
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: detective1-celery-beat
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres # If using a database scheduler for Celery Beat (e.g. django-celery-beat)
+      REDIS_HOST: redis
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    command: celery -A app.workers.celery_app beat -l info --scheduler celery.beat.PersistentScheduler -s /tmp/celerybeat-schedule
+    depends_on:
+      redis:
+        condition: service_healthy
+      # postgres: # Uncomment if using a database scheduler for Celery Beat
+      #   condition: service_healthy
+    networks:
+      - detective-net
+
+  frontend:
+    build:
+      context: ./frontend # Assumes frontend Dockerfile is in ./frontend/Dockerfile
+      dockerfile: Dockerfile
+    container_name: detective1-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # NEXT_PUBLIC_API_BASE_URL should point to the backend service
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8000
+      # Other frontend specific settings
+      NODE_ENV: ${NODE_ENV:-development}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - detective-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  neo4j_data:
+  neo4j_logs:
+  minio_data:
+  qdrant_data:
+
+networks:
+  detective-net:
+    driver: bridge
