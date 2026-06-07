@@ -63,6 +63,11 @@ class UserRole(BaseStrEnum):
     ADMIN = "admin"
     ANALYST = "analyst"
     REVIEWER = "reviewer"
+    # Additional roles referenced across the codebase (deps.py / models). Kept
+    # here as the single source of truth so RBAC references resolve consistently.
+    INVESTIGATOR = "investigator"
+    OSINT_AGENT = "osint_agent"
+    OPERATOR = "operator"
     VIEWER = "viewer"
 
 
@@ -73,8 +78,10 @@ class ClassificationLevel(BaseStrEnum):
     Ordered from least to most restrictive (use `level_index` for ordering).
     """
 
+    UNCLASSIFIED = "unclassified"
     PUBLIC = "public"
     INTERNAL = "internal"
+    RESTRICTED = "restricted"
     CONFIDENTIAL = "confidential"
     SECRET = "secret"
     TOP_SECRET = "top_secret"
@@ -83,13 +90,15 @@ class ClassificationLevel(BaseStrEnum):
     def level_index(self) -> int:
         """Numeric ordering of classification (higher = more restricted)."""
         order = {
-            ClassificationLevel.PUBLIC: 0,
-            ClassificationLevel.INTERNAL: 1,
-            ClassificationLevel.CONFIDENTIAL: 2,
-            ClassificationLevel.SECRET: 3,
-            ClassificationLevel.TOP_SECRET: 4,
+            ClassificationLevel.UNCLASSIFIED: 0,
+            ClassificationLevel.PUBLIC: 1,
+            ClassificationLevel.INTERNAL: 2,
+            ClassificationLevel.RESTRICTED: 3,
+            ClassificationLevel.CONFIDENTIAL: 4,
+            ClassificationLevel.SECRET: 5,
+            ClassificationLevel.TOP_SECRET: 6,
         }
-        return order[self]
+        return order.get(self, 0)
 
     def can_access(self, clearance: "ClassificationLevel") -> bool:
         """Return True if a user with `clearance` may access data at this level."""
@@ -302,4 +311,5 @@ class LLMProvider(BaseStrEnum):
 
     OPENAI = "openai"
     PERPLEXITY = "perplexity"
-    SONAR
+    SONAR = "sonar"
+    GEMINI = "gemini"

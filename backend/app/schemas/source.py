@@ -287,4 +287,14 @@ __all__ = [
     "SourceValidationRequest",
     "SourceRead",
     "SourceSummary",
-    "SourceListRespon
+    "SourceListResponse",
+    "SourceCredibilityResult",
+    "SourceInDB",
+]
+
+
+# ---------------------------------------------------------------------------
+# Cross-module compatible aliases (used by app.api.routes.sources).
+# ---------------------------------------------------------------------------
+SourceCredibilityResult = SourceCredibilityScore
+SourceInDB = SourceRead

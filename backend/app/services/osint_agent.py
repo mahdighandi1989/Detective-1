@@ -320,4 +320,209 @@ def _extract_json_payload(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _as_str
+def _as_str(value: Any) -> Optional[str]:
+    """تبدیل امن یک مقدار به رشته (یا None)."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return str(value)
+
+
+def _as_str_list(value: Any) -> List[str]:
+    """تبدیل امن یک مقدار به فهرستی از رشته‌ها."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        return [stripped] if stripped else []
+    if isinstance(value, (list, tuple, set)):
+        out: List[str] = []
+        for item in value:
+            s = _as_str(item)
+            if s:
+                out.append(s)
+        return out
+    return []
+
+
+def parse_person_record(
+    full_name: str,
+    payload: Dict[str, Any],
+    *,
+    raw_text: Optional[str] = None,
+) -> PersonRecord:
+    """یک payload (dict) خروجی مدل را به PersonRecord ساختاریافته تبدیل می‌کند."""
+    sources: List[DiscoveredSource] = []
+    for src in payload.get("sources") or []:
+        if isinstance(src, dict):
+            url = _as_str(src.get("url"))
+            if not url:
+                continue
+            sources.append(
+                DiscoveredSource(
+                    url=url,
+                    title=_as_str(src.get("title")),
+                    snippet=_as_str(src.get("snippet")),
+                )
+            )
+        else:
+            url = _as_str(src)
+            if url:
+                sources.append(DiscoveredSource(url=url))
+
+    sources = score_sources(sources)
+
+    record = PersonRecord(
+        full_name=_as_str(payload.get("full_name")) or full_name,
+        aliases=_as_str_list(payload.get("aliases")),
+        summary=_as_str(payload.get("summary")),
+        current_position=_as_str(payload.get("current_position")),
+        previous_positions=_as_str_list(payload.get("previous_positions")),
+        current_roles=_as_str_list(payload.get("current_roles")),
+        previous_roles=_as_str_list(payload.get("previous_roles")),
+        activities=_as_str_list(payload.get("activities")),
+        statements=_as_str_list(payload.get("statements")),
+        photo_url=_as_str(payload.get("photo_url")),
+        sources=sources,
+        raw_model_text=raw_text,
+    )
+    record.confidence = aggregate_confidence(sources)
+    return record
+
+
+def _coerce_llm_text(result: Any) -> Optional[str]:
+    """متنِ خروجی را از پاسخ مدل (با اشکال مختلف) استخراج می‌کند."""
+    if result is None:
+        return None
+    if isinstance(result, str):
+        return result
+    for attr in ("text", "content", "output_text", "answer"):
+        val = getattr(result, attr, None)
+        if isinstance(val, str) and val:
+            return val
+    if isinstance(result, dict):
+        for key in ("text", "content", "output", "message", "answer"):
+            val = result.get(key)
+            if isinstance(val, str) and val:
+                return val
+    return str(result)
+
+
+def _invoke_llm(
+    llm: Any, system_prompt: str, user_prompt: str
+) -> Optional[str]:
+    """فراخوانی دفاعی LLM adapter پروژه.
+
+    چون امضای دقیق adapter ممکن است متفاوت باشد، چند شکل رایج فراخوانی را
+    امتحان می‌کنیم و در صورت ناتوانی به‌صورت امن None برمی‌گردانیم. پاسخ
+    coroutine نیز به‌صورت همگام اجرا می‌شود (مناسب برای task های Celery).
+    """
+    callables: List[Any] = []
+    for method_name in ("complete", "generate", "chat", "ask", "run"):
+        method = getattr(llm, method_name, None)
+        if callable(method):
+            callables.append(method)
+    if not callables and callable(llm):
+        callables.append(llm)
+
+    for method in callables:
+        for args, kwargs in (
+            ((user_prompt,), {"system": system_prompt}),
+            ((user_prompt,), {"system_prompt": system_prompt}),
+            ((user_prompt,), {}),
+            ((system_prompt, user_prompt), {}),
+        ):
+            try:
+                res = method(*args, **kwargs)
+            except TypeError:
+                continue
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("LLM invocation failed: %s", exc)
+                break
+            if asyncio.iscoroutine(res):
+                try:
+                    res = asyncio.run(res)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("LLM async invocation failed: %s", exc)
+                    break
+            return _coerce_llm_text(res)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Agent
+# ---------------------------------------------------------------------------
+class OSINTAgent:
+    """عامل خودکار جمع‌آوری اطلاعات منبع‌باز دربارهٔ یک شخص.
+
+    از LLM adapter پروژه برای پرس‌وجو استفاده می‌کند، خروجی JSON را پارس کرده و
+    یک PersonRecord ساختاریافته با منابع امتیازدهی‌شده برمی‌گرداند. اگر LLM
+    پیکربندی نشده باشد، یک رکورد معتبرِ خالی (confidence=0) برمی‌گرداند تا
+    جریان فراخواننده نشکند.
+    """
+
+    def __init__(self, llm: Any = None) -> None:
+        self.llm = llm
+
+    def _resolve_llm(self) -> Any:
+        if self.llm is not None:
+            return self.llm
+        try:
+            self.llm = LLMAdapter()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM adapter unavailable for OSINT agent: %s", exc)
+            self.llm = None
+        return self.llm
+
+    def gather(
+        self,
+        full_name: str,
+        *,
+        context_hints: Optional[List[str]] = None,
+        locale: str = "fa",
+    ) -> PersonRecord:
+        """اطلاعات منبع‌باز یک شخص را جمع‌آوری و ساختارمند می‌کند."""
+        llm = self._resolve_llm()
+        if llm is None:
+            return PersonRecord(full_name=full_name, confidence=0.0)
+
+        prompt = build_lookup_prompt(
+            full_name, context_hints=context_hints, locale=locale
+        )
+        raw_text = _invoke_llm(llm, _SYSTEM_PROMPT, prompt)
+        if not raw_text:
+            return PersonRecord(full_name=full_name, confidence=0.0)
+
+        payload = _extract_json_payload(raw_text) or {}
+        return parse_person_record(full_name, payload, raw_text=raw_text)
+
+
+def gather_person_intelligence(
+    full_name: str,
+    *,
+    llm: Any = None,
+    context_hints: Optional[List[str]] = None,
+    locale: str = "fa",
+) -> PersonRecord:
+    """تابع راحت ماژول‌سطح برای جمع‌آوری اطلاعات یک شخص."""
+    return OSINTAgent(llm=llm).gather(
+        full_name, context_hints=context_hints, locale=locale
+    )
+
+
+__all__ = [
+    "RiskCategory",
+    "SourceCredibility",
+    "DiscoveredSource",
+    "PersonRecord",
+    "assess_source_credibility",
+    "credibility_to_score",
+    "score_sources",
+    "aggregate_confidence",
+    "build_lookup_prompt",
+    "parse_person_record",
+    "OSINTAgent",
+    "gather_person_intelligence",
+]

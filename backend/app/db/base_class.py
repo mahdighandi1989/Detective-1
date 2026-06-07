@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 from sqlalchemy import Column, DateTime, Integer, func
-from sqlalchemy.orm import DeclarativeBase, declared_attr
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
 
 def _camel_to_snake(name: str) -> str:
@@ -63,6 +63,13 @@ class Base(DeclarativeBase):
     - ``__tablename__``: auto-generated from the class name.
     """
 
+    # Allow legacy (non-``Mapped[]``) annotated ``Column`` attributes on this
+    # base and its subclasses. Several models use the classic
+    # ``x: Any = Column(...)`` style; this lets SQLAlchemy 2.0 map them without
+    # requiring the ``Mapped[]`` generic and avoids ArgumentError at mapper
+    # configuration time.
+    __allow_unmapped__ = True
+
     # Common metadata naming convention so Alembic produces stable,
     # predictable constraint / index names across migrations.
     metadata = None  # type: ignore[assignment]  # replaced below
@@ -71,15 +78,17 @@ class Base(DeclarativeBase):
     def __tablename__(cls) -> str:  # noqa: N805 - SQLAlchemy convention
         return _pluralize(_camel_to_snake(cls.__name__))
 
-    id: Any = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, index=True, autoincrement=True
+    )
 
-    created_at: Any = Column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
 
-    updated_at: Any = Column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),

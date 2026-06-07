@@ -145,6 +145,9 @@ AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
 # Backwards-compatible alias: some modules import `async_sessionmaker`
 # from this module expecting the configured factory.
 async_session_maker = AsyncSessionLocal
+# Some modules (e.g. app.api.deps) import the async session factory under this
+# name; expose it as an alias of the configured factory.
+async_session_factory = AsyncSessionLocal
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +211,7 @@ __all__ = [
     "SessionLocal",
     "AsyncSessionLocal",
     "async_session_maker",
+    "async_session_factory",
     "get_db",
     "get_async_db",
     "Base",

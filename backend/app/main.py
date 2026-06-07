@@ -233,4 +233,17 @@ def create_application() -> FastAPI:
 
     # -- API routers (fail-fast wiring) ------------------------------------
     api_prefix = getattr(settings, "API_V1_PREFIX", "/api/v1")
-    app.include_
+    from app.api import api_router
+
+    app.include_router(api_router, prefix=api_prefix)
+
+    return app
+
+
+# ---------------------------------------------------------------------------
+# Module-level ASGI application instance.
+#
+# Exposed as ``app`` so process managers can launch it with
+# ``uvicorn app.main:app`` (and Gunicorn's uvicorn worker class).
+# ---------------------------------------------------------------------------
+app = create_application()

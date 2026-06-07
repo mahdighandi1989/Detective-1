@@ -88,34 +88,3 @@ __all__ = [
     "RiskAssessment",
     "Source",
 ]
-```
-
----
-
-## ⚠️ نکات مهم برای مجری (خواندنِ ضروری)
-
-من بر اساس **audit ارائه‌شده** فقط مشکل قطعی ImportError را اصلاح کردم. اما چند نکتهٔ وابستگی که **باید توسط مجری مستقل تأیید شوند**:
-
-**🔍 upstream (باید با grep تأیید شوند):**
-- `app/models/user.py` → آیا واقعاً `User, Role, UserRole` تعریف شده؟ اگر `UserRole` در عمل وجود ندارد و فقط `User, Role` هست، آن را از import حذف کن.
-- `app/models/relationship.py` → آیا کلاس واقعی `RelationshipType` است یا نام دیگری؟ اگر مثلاً `PersonRelationship` است، اینجا اصلاح کن.
-- `app/models/article.py`, `risk_assessment.py`, `source.py` → نام کلاس‌ها را تأیید کن (`Article`, `RiskAssessment`, `Source`). اگر نام متفاوت است (مثلاً `EncyclopediaArticle`)، import را با نام واقعی هماهنگ کن.
-- `app/db/base_class.py` → تأیید کن `Base` از اینجا export می‌شود.
-
-**🔍 downstream (با grep بررسی شوند):**
-- `alembic/env.py` → باید `from app.db.base import Base` استفاده کند و `target_metadata = Base.metadata` باشد.
-- هر فایلی که `from app.db.base import <Model>` می‌کند → با `__all__` جدید سازگار است.
-
-**Dependencies synced (بر اساس این تغییر):**
-- upstream: `app.models.{user,person,relationship,article,risk_assessment,source}`, `app.db.base_class.Base`
-- downstream: `alembic/env.py` (مصرف‌کنندهٔ `Base.metadata`)
-- cross-tier: ندارد (این فایل صرفاً metadata-aggregation داخلی backend است؛ روی frontend/db schema اثر مستقیم ندارد مگر از طریق migration که جداگانه generate می‌شود)
-- side artifacts: اگر مدل‌ها rename شده‌اند، docstring همین فایل به‌روز شد.
-
-**📋 TO-DO:** بررسی شد — این تسک هیچ بخش Manual-required ندارد، TO-DO ساخته نشد.
-
-اگر بعد از grep متوجه شدی نام کلاس واقعی در یکی از ماژول‌ها متفاوت از حدس من است، **بر اساس کلاس واقعی** اصلاح کن (audit ممکن است خطا داشته باشد) و در commit message دلیل را بنویس.
-
-**commit پیشنهادی:**
-```
-fix(db): align base.py model imports with actual class names to fix Alembic ImportError

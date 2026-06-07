@@ -290,4 +290,29 @@ class AuditService:
         action: "AuditAction | str | None" = None,
         limit: int = 50,
         offset: int = 0,
-    )
+    ) -> Sequence[AuditLog]:
+        return await list_audit_events(
+            self.db,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            actor_id=actor_id,
+            action=action,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def count(
+        self,
+        *,
+        entity_type: "AuditEntityType | str | None" = None,
+        entity_id: Optional[str] = None,
+        actor_id: Optional[int] = None,
+        action: "AuditAction | str | None" = None,
+    ) -> int:
+        return await count_audit_events(
+            self.db,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            actor_id=actor_id,
+            action=action,
+        )

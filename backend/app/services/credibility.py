@@ -252,3 +252,193 @@ class CredibilityScorer:
         has_citations: bool = False,
         now: Optional[datetime] = None,
     ) -> CredibilityResult:
+        """امتیاز اعتبار یک منبع را بر اساس فاکتورهای متعدد محاسبه می‌کند."""
+        now = now or datetime.now(timezone.utc)
+        domain = self._extract_domain(url)
+        resolved_type = source_type or self._infer_source_type(url, domain)
+
+        signals: list[CredibilitySignal] = []
+
+        # 1) نوع منبع
+        signals.append(
+            CredibilitySignal(
+                name="source_type",
+                value=resolved_type.base_weight,
+                weight=self.weights.get("source_type", 0.0),
+                explanation=f"نوع منبع: {resolved_type.value}",
+            )
+        )
+
+        # 2) شهرت دامنه (baseline 0.5 ± تعدیل)
+        rep_adj = self._domain_reputation(domain)
+        signals.append(
+            CredibilitySignal(
+                name="domain_reputation",
+                value=_clamp(0.5 + rep_adj, 0.0, 1.0),
+                weight=self.weights.get("domain_reputation", 0.0),
+                explanation=f"شهرت دامنه ({domain or 'نامشخص'}): adj={rep_adj:+.2f}",
+            )
+        )
+
+        # 3) تازگی (decay نمایی با نیمه‌عمر)
+        signals.append(
+            CredibilitySignal(
+                name="recency",
+                value=self._recency_score(published_at, now),
+                weight=self.weights.get("recency", 0.0),
+                explanation="تازگی منبع بر اساس تاریخ انتشار",
+            )
+        )
+
+        # 4) تأییدهای متقاطع
+        signals.append(
+            CredibilitySignal(
+                name="cross_reference",
+                value=_clamp(cross_references / 5.0, 0.0, 1.0),
+                weight=self.weights.get("cross_reference", 0.0),
+                explanation=f"{cross_references} تأیید متقاطع",
+            )
+        )
+
+        # 5) سابقهٔ صحت تاریخی
+        signals.append(
+            CredibilitySignal(
+                name="historical_accuracy",
+                value=(
+                    _clamp(historical_accuracy, 0.0, 1.0)
+                    if historical_accuracy is not None
+                    else 0.5
+                ),
+                weight=self.weights.get("historical_accuracy", 0.0),
+                explanation="سابقهٔ صحت منبع/دامنه",
+            )
+        )
+
+        # 6) کیفیت محتوا (طول، نویسنده، ارجاعات)
+        signals.append(
+            CredibilitySignal(
+                name="content_quality",
+                value=self._content_quality(content_length, has_author, has_citations),
+                weight=self.weights.get("content_quality", 0.0),
+                explanation="کیفیت محتوا (طول/نویسنده/ارجاعات)",
+            )
+        )
+
+        total_weight = sum(s.weight for s in signals) or 1.0
+        final_score = _clamp(
+            sum(s.contribution for s in signals) / total_weight, 0.0, 1.0
+        )
+
+        return CredibilityResult(
+            score=final_score,
+            tier=CredibilityTier.from_score(final_score),
+            source_type=resolved_type,
+            signals=signals,
+            domain=domain,
+            assessed_at=now,
+        )
+
+    # -- internals ----------------------------------------------------------
+    @staticmethod
+    def _extract_domain(url: Optional[str]) -> Optional[str]:
+        if not url:
+            return None
+        try:
+            netloc = urlparse(
+                url if "://" in url else f"http://{url}"
+            ).netloc.lower()
+        except Exception:
+            return None
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+        return netloc or None
+
+    def _domain_reputation(self, domain: Optional[str]) -> float:
+        if not domain:
+            return 0.0
+        adj = 0.0
+        for known, value in _DOMAIN_REPUTATION.items():
+            if domain == known or domain.endswith("." + known):
+                adj += value
+                break
+        for tld, value in _TLD_REPUTATION.items():
+            if domain.endswith(tld):
+                adj += value
+                break
+        return _clamp(adj, -0.5, 0.5)
+
+    @staticmethod
+    def _infer_source_type(url: Optional[str], domain: Optional[str]) -> SourceType:
+        hay = f"{url or ''} {domain or ''}"
+        if _OFFICIAL_HINTS.search(hay):
+            return SourceType.OFFICIAL
+        if _NEWS_AGENCY_HINTS.search(hay):
+            return SourceType.NEWS_AGENCY
+        if _ACADEMIC_HINTS.search(hay):
+            return SourceType.ACADEMIC
+        if _WIKI_HINTS.search(hay):
+            return SourceType.ENCYCLOPEDIA
+        if _SOCIAL_HINTS.search(hay):
+            return SourceType.SOCIAL_MEDIA
+        if _FORUM_HINTS.search(hay):
+            return SourceType.FORUM
+        if _BLOG_HINTS.search(hay):
+            return SourceType.BLOG
+        return SourceType.UNKNOWN
+
+    def _recency_score(
+        self, published_at: Optional[datetime], now: datetime
+    ) -> float:
+        if published_at is None:
+            return 0.5
+        try:
+            if published_at.tzinfo is None:
+                published_at = published_at.replace(tzinfo=timezone.utc)
+            age_days = max(0.0, (now - published_at).total_seconds() / 86400.0)
+        except Exception:
+            return 0.5
+        return _clamp(0.5 ** (age_days / self.RECENCY_HALF_LIFE_DAYS), 0.0, 1.0)
+
+    @staticmethod
+    def _content_quality(
+        content_length: Optional[int], has_author: bool, has_citations: bool
+    ) -> float:
+        score = 0.0
+        if content_length:
+            score += _clamp(content_length / 4000.0, 0.0, 0.6)
+        if has_author:
+            score += 0.2
+        if has_citations:
+            score += 0.2
+        return _clamp(score, 0.0, 1.0)
+
+
+def _clamp(value: float, lo: float, hi: float) -> float:
+    """مقدار را در بازهٔ [lo, hi] محدود می‌کند."""
+    return max(lo, min(hi, float(value)))
+
+
+def score_source(
+    *,
+    url: Optional[str] = None,
+    source_type: Optional[SourceType] = None,
+    published_at: Optional[datetime] = None,
+    cross_references: int = 0,
+    historical_accuracy: Optional[float] = None,
+    content_length: Optional[int] = None,
+    has_author: bool = False,
+    has_citations: bool = False,
+    now: Optional[datetime] = None,
+) -> CredibilityResult:
+    """تابع راحت ماژول‌سطح: یک منبع را با CredibilityScorer پیش‌فرض امتیاز می‌دهد."""
+    return CredibilityScorer().score(
+        url=url,
+        source_type=source_type,
+        published_at=published_at,
+        cross_references=cross_references,
+        historical_accuracy=historical_accuracy,
+        content_length=content_length,
+        has_author=has_author,
+        has_citations=has_citations,
+        now=now,
+    )

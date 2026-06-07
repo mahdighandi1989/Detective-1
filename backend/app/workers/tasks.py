@@ -294,3 +294,69 @@ def score_source_credibility(self, source_id: int) -> dict[str, Any]:
 @celery_app.task(name="app.workers.tasks.assess_person_risk", bind=True)
 def assess_person_risk(self, person_id: int) -> dict[str, Any]:
     """
+    ارزیابی ریسک یک شخص را با موتور ریسک اجرا و نتیجه را ثبت می‌کند.
+
+    به‌صورت دفاعی نوشته شده: اگر سرویس موتور ریسک در دسترس نباشد یا API آن
+    متفاوت باشد، task بدون شکستن صف، یک وضعیت معنادار برمی‌گرداند.
+    """
+    services = _lazy_import_services()
+    risk_mod = services.get("risk_engine")
+    session = _session_scope()
+    result: dict[str, Any] = {"person_id": person_id, "status": "skipped"}
+    try:
+        if risk_mod is None:
+            result["status"] = "unavailable"
+            result["error"] = "risk_engine service is not available"
+            return result
+
+        engine_cls = getattr(risk_mod, "RiskEngine", None)
+        if engine_cls is None:
+            result["status"] = "unavailable"
+            result["error"] = "RiskEngine not found in risk_engine module"
+            return result
+
+        engine = engine_cls()
+        assess = getattr(engine, "assess_person", None) or getattr(
+            engine, "assess", None
+        )
+        if not callable(assess):
+            result["status"] = "noop"
+            return result
+
+        outcome = assess(person_id)
+        if isinstance(outcome, dict):
+            result["risk_level"] = outcome.get("risk_level")
+        else:
+            result["risk_level"] = getattr(outcome, "risk_level", None)
+        result["status"] = "completed"
+        session.commit()
+        return result
+    except Exception as exc:  # noqa: BLE001
+        session.rollback()
+        logger.exception("assess_person_risk failed: %s", exc)
+        result["status"] = "error"
+        result["error"] = str(exc)
+        return result
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
+# Aliasهای سازگار با نام‌هایی که route ها از این ماژول import می‌کنند.
+# ---------------------------------------------------------------------------
+run_osint_search = collect_person_osint
+run_risk_assessment = assess_person_risk
+process_article = classify_and_summarize_article
+
+
+__all__ = [
+    "celery_app",
+    "classify_and_summarize_article",
+    "generate_embedding",
+    "collect_person_osint",
+    "score_source_credibility",
+    "assess_person_risk",
+    "run_osint_search",
+    "run_risk_assessment",
+    "process_article",
+]

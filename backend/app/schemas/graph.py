@@ -232,4 +232,119 @@ class GraphNode(GraphNodeBase):
             level = self.risk_level
             if not isinstance(level, RiskLevel):
                 level = RiskLevel(level)
-            self.color = _RISK_COLOR_MAP.get(level, _RISK_COLOR_MAP
+            self.color = _RISK_COLOR_MAP.get(level, _RISK_COLOR_MAP[RiskLevel.UNKNOWN])
+        return self
+
+
+# ---------------------------------------------------------------------------
+# Edge schemas
+# ---------------------------------------------------------------------------
+class GraphEdgeBase(BaseModel):
+    """فیلدهای مشترک یک یال (رابطه) در نمودار."""
+
+    model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
+
+    source: str = Field(..., description="شناسهٔ گره مبدأ.")
+    target: str = Field(..., description="شناسهٔ گره مقصد.")
+    type: EdgeType = Field(
+        default=EdgeType.ASSOCIATED_WITH, description="نوع رابطه."
+    )
+    label: Optional[str] = Field(
+        default=None, max_length=255, description="برچسب نمایشی رابطه."
+    )
+    weight: Optional[float] = Field(
+        default=None, ge=0.0, description="وزن/شدت رابطه (برای ضخامت یال)."
+    )
+    directed: bool = Field(default=True, description="جهت‌دار بودن رابطه.")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("source", "target", mode="before")
+    @classmethod
+    def _coerce_endpoint(cls, value: Any) -> str:
+        return str(value)
+
+
+class GraphEdgeCreate(GraphEdgeBase):
+    """ورودی ساخت یال جدید."""
+
+
+class GraphEdge(GraphEdgeBase):
+    """یال کامل با شناسه — خروجی API."""
+
+    id: str = Field(..., description="شناسهٔ یکتای یال.")
+    created_at: Optional[datetime] = None
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def _coerce_id(cls, value: Any) -> str:
+        return str(value)
+
+
+# ---------------------------------------------------------------------------
+# Graph container / query
+# ---------------------------------------------------------------------------
+class GraphData(BaseModel):
+    """نمودار کامل: مجموعهٔ گره‌ها و یال‌ها (خروجی اصلی API نمودار)."""
+
+    model_config = ConfigDict(use_enum_values=True)
+
+    nodes: list[GraphNode] = Field(default_factory=list)
+    edges: list[GraphEdge] = Field(default_factory=list)
+    layout: LayoutAlgorithm = Field(
+        default=LayoutAlgorithm.FORCE,
+        description="الگوریتم چیدمان پیشنهادی برای رندر در frontend.",
+    )
+
+    def resolve_colors(self) -> "GraphData":
+        """رنگ همهٔ گره‌های فاقد رنگ را از روی risk_level پر می‌کند."""
+        for node in self.nodes:
+            node.with_resolved_color()
+        return self
+
+
+# نام جایگزین سازگار با سایر ماژول‌ها (route گراف).
+GraphResponse = GraphData
+
+
+class GraphQuery(BaseModel):
+    """پارامترهای فیلتر برای واکشی نمودار ارتباطی."""
+
+    model_config = ConfigDict(use_enum_values=True)
+
+    person_id: Optional[int] = Field(
+        default=None, description="ریشهٔ نمودار: شناسهٔ شخص مرکزی."
+    )
+    depth: int = Field(
+        default=1, ge=1, le=4, description="عمق پیمایش روابط از گرهٔ ریشه."
+    )
+    risk_levels: Optional[list[RiskLevel]] = Field(
+        default=None, description="فقط گره‌هایی با این سطوح ریسک."
+    )
+    node_types: Optional[list[NodeType]] = Field(
+        default=None, description="فقط گره‌هایی با این انواع."
+    )
+    edge_types: Optional[list[EdgeType]] = Field(
+        default=None, description="فقط روابطی با این انواع."
+    )
+    include_isolated: bool = Field(
+        default=False, description="آیا گره‌های بدون رابطه هم برگردانده شوند؟"
+    )
+
+
+__all__ = [
+    "RiskLevel",
+    "NodeType",
+    "EdgeType",
+    "LayoutAlgorithm",
+    "NodePosition",
+    "GraphNodeBase",
+    "GraphNodeCreate",
+    "GraphNodeUpdate",
+    "GraphNode",
+    "GraphEdgeBase",
+    "GraphEdgeCreate",
+    "GraphEdge",
+    "GraphData",
+    "GraphResponse",
+    "GraphQuery",
+]

@@ -285,4 +285,7 @@ async def update_source(
             is_primary=bool(source.is_primary),
         )
 
-    source.updated_at = datetime.now(timezone.utc
+    source.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(source)
+    return source

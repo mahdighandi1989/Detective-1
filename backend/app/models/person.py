@@ -76,6 +76,20 @@ class VerificationStatus(str, enum.Enum):
     DISPUTED = "disputed"
 
 
+class PersonStatus(str, enum.Enum):
+    """وضعیت کلی چرخهٔ حیات یک پروفایل شخص."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    ARCHIVED = "archived"
+    UNKNOWN = "unknown"
+
+
+# Re-export the canonical ClassificationLevel so modules that import it from
+# here (e.g. the persons router) keep working without duplicating the enum.
+from app.core.enums import ClassificationLevel  # noqa: E402,F401
+
+
 class Person(Base):
     """
     مدل SQLAlchemy برای نگهداری پروفایل اشخاص.

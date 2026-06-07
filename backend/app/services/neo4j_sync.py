@@ -22,10 +22,18 @@ class Neo4jSyncService:
 
     def __init__(self) -> None:
         self.uri = settings.NEO4J_URI
-        self.user = settings.NEO4J_USER
-        self.password = settings.NEO4J_PASSWORD
+        self.user = settings.NEO4J_USERNAME
+        pwd = settings.NEO4J_PASSWORD
+        self.password = (
+            pwd.get_secret_value() if hasattr(pwd, "get_secret_value") else pwd
+        )
         self.driver = None
-        self._initialize_driver()
+        # فقط در صورت پیکربندی کامل Neo4j تلاش به اتصال می‌کنیم؛ در غیر این صورت
+        # سرویس به‌صورت no-op عمل می‌کند (graph sync غیرفعال).
+        if self.uri and self.user and self.password:
+            self._initialize_driver()
+        else:
+            logger.info("Neo4j is not configured; graph sync is disabled.")
 
     # ------------------------------------------------------------------ #
     # مدیریت اتصال
@@ -294,3 +302,22 @@ class Neo4jSyncService:
         """
         cleaned = "".join(
             ch for ch in (rel_type or "") if ch.isalnum() or ch == "_"
+        )
+        return cleaned or "CONNECTED_TO"
+
+
+# ---------------------------------------------------------------------------
+# Module-level lazy singleton
+# ---------------------------------------------------------------------------
+_neo4j_sync_singleton: Optional[Neo4jSyncService] = None
+
+
+def get_neo4j_sync() -> Neo4jSyncService:
+    """نمونهٔ singleton (تنبل) سرویس همگام‌سازی Neo4j را برمی‌گرداند."""
+    global _neo4j_sync_singleton
+    if _neo4j_sync_singleton is None:
+        _neo4j_sync_singleton = Neo4jSyncService()
+    return _neo4j_sync_singleton
+
+
+__all__ = ["Neo4jSyncService", "get_neo4j_sync"]

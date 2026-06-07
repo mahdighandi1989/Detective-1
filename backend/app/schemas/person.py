@@ -93,7 +93,11 @@ class PersonInDB(PersonBase):
 
 class PersonRead(PersonInDB):
     """Alias returned to API clients."""
-    pass
+
+    @classmethod
+    def from_person(cls, person: object) -> "PersonRead":
+        """Build a PersonRead from an ORM Person instance."""
+        return cls.model_validate(person)
 
 
 class PersonSummary(BaseModel):
@@ -115,3 +119,63 @@ class PersonList(BaseModel):
     items: List[PersonSummary] = Field(default_factory=list)
     page: int = 1
     page_size: int = 50
+
+
+class PersonListItem(PersonSummary):
+    """آیتم لیست اشخاص (نمایش خلاصه برای فهرست‌ها)."""
+    pass
+
+
+class PositionHistoryCreate(PersonPositionCreate):
+    """ورودی ساخت یک سابقهٔ سمت برای شخص."""
+    pass
+
+
+class PositionHistoryRead(PersonPosition):
+    """نمایش یک سابقهٔ سمت."""
+    pass
+
+
+class RiskAssessmentRead(BaseModel):
+    """نمایش یک ارزیابی ریسک مرتبط با شخص."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: Optional[UUID] = None
+    person_id: Optional[UUID] = None
+    risk_level: Optional[str] = None
+    category: Optional[str] = None
+    score: Optional[float] = None
+    summary: Optional[str] = None
+    rationale: Optional[str] = None
+    is_manual_override: bool = False
+    created_at: Optional[datetime] = None
+
+
+class AuditLogRead(BaseModel):
+    """نمایش یک رخداد audit مرتبط با شخص."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: Optional[int] = None
+    action: Optional[str] = None
+    actor_id: Optional[int] = None
+    actor_username: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    description: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class OsintSearchRequest(BaseModel):
+    """درخواست اجرای جستجوی OSINT برای یک شخص."""
+    query: Optional[str] = None
+    context_hints: List[str] = Field(default_factory=list)
+    locale: str = "fa"
+    force: bool = False
+
+
+class OsintSearchResponse(BaseModel):
+    """پاسخ شروع جستجوی OSINT (معمولاً به‌صورت async صف می‌شود)."""
+    person_id: Optional[UUID] = None
+    status: str = "queued"
+    task_id: Optional[str] = None
+    detail: Optional[str] = None

@@ -278,4 +278,17 @@ async def update_person(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> PersonRead:
-    person = await _get_person_or_404(db,
+    person = await _get_person_or_404(db, person_id, with_relations=True)
+    if not _can_access_classification(current_user, person.classification):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="سطح دسترسی کافی ندارید",
+        )
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(person, field, value)
+
+    await db.commit()
+    await db.refresh(person)
+    return PersonRead.from_person(person)
