@@ -8,6 +8,7 @@ authentication, and security settings.
 from __future__ import annotations
 
 import json
+import logging
 from functools import lru_cache
 from typing import Any, List, Optional, Union
 
@@ -22,6 +23,8 @@ from pydantic import (
     AnyUrl,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger("detective1.config")
 
 
 class Settings(BaseSettings):
@@ -204,12 +207,24 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_llm_keys(self) -> "Settings":
-        if self.LLM_PROVIDER == "openai" and not self.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY must be set if LLM_PROVIDER is 'openai'")
-        if self.LLM_PROVIDER == "perplexity" and not self.PERPLEXITY_API_KEY:
-            raise ValueError("PERPLEXITY_API_KEY must be set if LLM_PROVIDER is 'perplexity'")
-        if self.LLM_PROVIDER == "gemini" and not self.GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY must be set if LLM_PROVIDER is 'gemini'")
+        # The LLM provider key is only needed when the LLM is actually invoked
+        # (OSINT search agents, summarisation, embeddings — all lazy and/or run
+        # inside Celery workers). Do NOT block process startup on a missing
+        # key: warn instead, so the API and worker can boot in environments
+        # where the LLM is not configured yet. Calls that need the key will
+        # fail explicitly at call time.
+        provider_key = {
+            "openai": ("OPENAI_API_KEY", self.OPENAI_API_KEY),
+            "perplexity": ("PERPLEXITY_API_KEY", self.PERPLEXITY_API_KEY),
+            "gemini": ("GEMINI_API_KEY", self.GEMINI_API_KEY),
+        }.get(self.LLM_PROVIDER)
+        if provider_key is not None and not provider_key[1]:
+            logger.warning(
+                "%s is not set while LLM_PROVIDER=%r; LLM-backed features will "
+                "fail until it is configured.",
+                provider_key[0],
+                self.LLM_PROVIDER,
+            )
         return self
 
     @property
