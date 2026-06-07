@@ -46,6 +46,8 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
       - key: SECRET_KEY
         generateValue: true  # کلید امن تصادفی ≥ ۳۲ کاراکتر تولید می‌کند
       - key: DATABASE_URL
@@ -88,6 +90,8 @@ services:
     startCommand: "celery -A app.workers.celery_app worker --loglevel=info"
     autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
       - key: SECRET_KEY
         fromService:
           type: web
