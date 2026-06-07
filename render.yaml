@@ -1,0 +1,136 @@
+# ===========================================================================
+# Detective-1 — Render Blueprint (Infrastructure as Code)
+#
+# این فایل هر ۵ سرویس را با نوع، build/start command و اتصال خودکار env
+# (به PostgreSQL و Redis) به‌صورت درست تعریف می‌کند تا دیپلوی بازتولیدپذیر
+# باشد و دیگر نیازی به تنظیم دستی در داشبورد نباشد.
+#
+# نحوهٔ استفاده:
+#   Render Dashboard → New → Blueprint → انتخاب همین ریپو/برنچ.
+#   (سرویس‌های اشتباهِ فعلی — frontend به‌صورت Static و celery-worker به‌صورت
+#    Web Service — را قبلش حذف کن چون نوعشان بعد از ساخت قابل‌تغییر نیست.)
+#
+# توجه: مقادیر حساس مثل OPENAI_API_KEY با sync:false علامت خورده‌اند؛ آن‌ها را
+# دستی در داشبورد وارد کن. قابلیت‌های Neo4j/MinIO/Qdrant اختیاری‌اند و فقط در
+# صورت افزودن سرویس‌ها و env مربوطه فعال می‌شوند.
+# ===========================================================================
+
+databases:
+  - name: detective-1-db
+    databaseName: detective1
+    user: detective
+    plan: free
+    region: oregon
+
+services:
+  # -------------------------------------------------------------------------
+  # Redis / Valkey — broker و result backend برای Celery و کش
+  # -------------------------------------------------------------------------
+  - type: redis
+    name: detective-1-redis
+    plan: free
+    region: oregon
+    ipAllowList: []  # فقط دسترسی داخلی (از سایر سرویس‌های Render)
+
+  # -------------------------------------------------------------------------
+  # Backend — FastAPI (uvicorn)
+  # -------------------------------------------------------------------------
+  - type: web
+    name: detective-1-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true  # کلید امن تصادفی ≥ ۳۲ کاراکتر تولید می‌کند
+      - key: DATABASE_URL
+        fromDatabase:
+          name: detective-1-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: detective-1-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: detective-1-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: detective-1-redis
+          property: connectionString
+      - key: LLM_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false  # اختیاری؛ برای فعال‌کردن قابلیت‌های LLM دستی وارد کن
+      - key: BACKEND_CORS_ORIGINS
+        value: https://detective-1-frontend.onrender.com
+
+  # -------------------------------------------------------------------------
+  # Celery worker — Background Worker (بدون پورت)
+  # نکتهٔ کلیدی: اپ Celery در app.workers.celery_app است، نه app.main.
+  # -------------------------------------------------------------------------
+  - type: worker
+    name: detective-1-celery-worker
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A app.workers.celery_app worker --loglevel=info"
+    autoDeploy: true
+    envVars:
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: detective-1-backend
+          envVarKey: SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: detective-1-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: detective-1-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: detective-1-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: detective-1-redis
+          property: connectionString
+      - key: LLM_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # -------------------------------------------------------------------------
+  # Frontend — Next.js (standalone) از طریق Docker
+  # (نوع Docker، نه Static — این اپ یک سرور Node می‌سازد نه خروجی استاتیک.)
+  # -------------------------------------------------------------------------
+  - type: web
+    name: detective-1-frontend
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    autoDeploy: true
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://detective-1-backend.onrender.com
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
