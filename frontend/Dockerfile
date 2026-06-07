@@ -47,6 +47,9 @@ COPY --from=builder /app/.next/static ./.next/static
 # Expose the port on which the Next.js application will run (default is 3000)
 EXPOSE 3000
 
-# Define the command to start the Next.js application.
-# This assumes your `package.json` has a "start" script that runs `next start`.
-CMD ["npm", "start"]
+# The Next.js standalone output produces a self-contained `server.js` and does
+# NOT include the `next` CLI, so `next start` / `npm start` fails with
+# "next: not found". Run the standalone server directly. Bind to 0.0.0.0 so the
+# platform (Render) can reach it; PORT is injected by the host at runtime.
+ENV HOSTNAME=0.0.0.0
+CMD ["node", "server.js"]
