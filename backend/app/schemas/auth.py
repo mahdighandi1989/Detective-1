@@ -251,4 +251,41 @@ class UserRegister(BaseModel):
         return _validate_password_strength(value)
 
 
-class UserUpdate(Ba
+class UserUpdate(BaseModel):
+    """schema برای به‌روزرسانی کاربر (همهٔ فیلدها اختیاری)."""
+
+    email: Optional[EmailStr] = Field(default=None, description="ایمیل جدید")
+    full_name: Optional[str] = Field(default=None, max_length=255)
+    role: Optional[UserRole] = Field(default=None, description="نقش جدید کاربر")
+    clearance: Optional[ClassificationLevel] = Field(
+        default=None, description="سطح دسترسی جدید"
+    )
+    is_active: Optional[bool] = Field(default=None, description="فعال/غیرفعال بودن حساب")
+    password: Optional[str] = Field(
+        default=None, min_length=_PASSWORD_MIN_LEN, max_length=128
+    )
+
+    @field_validator("password")
+    @classmethod
+    def _check_password(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        return _validate_password_strength(value)
+
+
+class UserOut(UserBase):
+    """schema خروجی کاربر (پاسخ API) — بدون رمز عبور."""
+
+    id: int = Field(..., description="شناسهٔ یکتای کاربر")
+    created_at: Optional[datetime] = Field(default=None, description="زمان ایجاد حساب")
+    updated_at: Optional[datetime] = Field(
+        default=None, description="زمان آخرین به‌روزرسانی"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TokenRefresh(BaseModel):
+    """درخواست تمدید توکن با استفاده از refresh token (نام جایگزین معمول)."""
+
+    refresh_token: str = Field(..., description="refresh token معتبر")

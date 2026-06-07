@@ -327,4 +327,19 @@ async def list_articles(
         count_stmt = count_stmt.where(cond)
 
     total_result = await db.execute(count_stmt)
-    total = int(total_result.scalar_
+    total = int(total_result.scalar_one() or 0)
+
+    stmt = (
+        stmt.order_by(Article.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    result = await db.execute(stmt)
+    articles = result.scalars().all()
+
+    return ArticleListResponse(
+        items=[ArticleResponse.model_validate(a) for a in articles],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )

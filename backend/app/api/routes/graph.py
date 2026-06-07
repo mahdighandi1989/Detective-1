@@ -319,4 +319,29 @@ async def get_person_neighbors(
     nodes_by_id[center_node.id] = center_node
 
     edges: list[GraphEdge] = []
-    seen_edge_ids:
+    seen_edge_ids: set[str] = set()
+
+    for src, tgt, label in _extract_relationships(center):
+        # Resolve the neighbor on the other end of the relationship.
+        neighbor_id = tgt if src == center_node.id else src
+        if neighbor_id not in nodes_by_id:
+            try:
+                neighbor_pk = int(neighbor_id)
+            except (TypeError, ValueError):
+                neighbor_pk = None
+            neighbor = (
+                await db.get(Person, neighbor_pk) if neighbor_pk is not None else None
+            )
+            if neighbor is None:
+                # Skip relationships pointing to persons not in the database.
+                continue
+            node = _person_to_node(neighbor)
+            nodes_by_id[node.id] = node
+
+        edge_id = f"{src}->{tgt}"
+        if edge_id in seen_edge_ids:
+            continue
+        seen_edge_ids.add(edge_id)
+        edges.append(GraphEdge(id=edge_id, source=src, target=tgt, label=label))
+
+    return GraphResponse(nodes=list(nodes_by_id.values()), edges=edges)

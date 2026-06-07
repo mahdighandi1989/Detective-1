@@ -216,4 +216,85 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
         client = self._get_client()
         response = client.embeddings.create(
             model=self.model,
-            input=[t or " "
+            input=[t or " " for t in texts],
+        )
+        return [
+            EmbeddingResult(
+                vector=list(item.embedding),
+                model=self.model,
+                dim=len(item.embedding),
+            )
+            for item in response.data
+        ]
+
+
+# ---------------------------------------------------------------------------
+# High-level service
+# ---------------------------------------------------------------------------
+class EmbeddingsService:
+    """API سطح‌بالا برای تولید embedding و رتبه‌بندی معنایی.
+
+    provider به‌صورت خودکار انتخاب می‌شود: اگر OPENAI_API_KEY تنظیم شده باشد از
+    OpenAI استفاده می‌شود، در غیر این صورت به provider قطعیِ محلی برمی‌گردد تا
+    تولید embedding همیشه (حتی بدون سرویس خارجی) کار کند.
+    """
+
+    def __init__(self, provider: Optional[BaseEmbeddingProvider] = None) -> None:
+        self.provider = provider or self._build_default_provider()
+
+    @staticmethod
+    def _build_default_provider() -> BaseEmbeddingProvider:
+        key = _get_setting("OPENAI_API_KEY")
+        if key is not None and hasattr(key, "get_secret_value"):
+            key = key.get_secret_value()
+        provider_name = (_get_setting("LLM_PROVIDER", "") or "").lower()
+        if key and provider_name in ("", "openai"):
+            try:
+                model = (
+                    _get_setting("EMBEDDING_MODEL_NAME", "text-embedding-3-small")
+                    or "text-embedding-3-small"
+                )
+                return OpenAIEmbeddingProvider(api_key=str(key), model=str(model))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "OpenAI embeddings unavailable; using local provider: %s", exc
+                )
+        return DeterministicLocalProvider()
+
+    # -- core embedding API -------------------------------------------------
+    def embed(self, text: str) -> EmbeddingResult:
+        return self.provider.embed(text)
+
+    def embed_text(self, text: str) -> List[float]:
+        return self.provider.embed(text).vector
+
+    def embed_batch(self, texts: Sequence[str]) -> List[EmbeddingResult]:
+        return self.provider.embed_batch(texts)
+
+    # -- similarity helpers -------------------------------------------------
+    @staticmethod
+    def cosine_similarity(a: Sequence[float], b: Sequence[float]) -> float:
+        if not a or not b:
+            return 0.0
+        n = min(len(a), len(b))
+        dot = sum(a[i] * b[i] for i in range(n))
+        na = (sum(x * x for x in a) ** 0.5) or 1.0
+        nb = (sum(x * x for x in b) ** 0.5) or 1.0
+        return dot / (na * nb)
+
+    def rank_by_similarity(
+        self,
+        query: str,
+        candidates: Sequence[tuple[Any, Sequence[float]]],
+        limit: int = 10,
+    ) -> List[tuple[Any, float]]:
+        """نامزدها را بر اساس شباهت کسینوسی به query رتبه‌بندی می‌کند.
+
+        هر نامزد یک tuple (object, embedding_vector) است.
+        """
+        q = self.embed_text(query)
+        scored = [
+            (obj, self.cosine_similarity(q, vec)) for obj, vec in candidates if vec
+        ]
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return scored[: max(1, limit)]

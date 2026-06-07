@@ -259,4 +259,9 @@ async def override_risk(
         category=payload.category.value,
         score=payload.score,
         rationale=payload.rationale,
-        is
+        is_manual_override=True,
+    )
+    db.add(assessment)
+    await db.commit()
+    await db.refresh(assessment)
+    return _to_read_model(assessment)
