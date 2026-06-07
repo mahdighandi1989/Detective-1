@@ -2,18 +2,8 @@
   "version": 1,
   "project": "mahdighandi1989/Detective-1",
   "watched_id": "da869845-ceca-4630-a640-722ae9a7842d",
-  "total": 3,
+  "total": 2,
   "tasks": [
-    {
-      "task_id": "40bc3f67-8c9b-4629-b7c8-ea7e48f6ad29",
-      "title": "جلوگیری افشای کلیدهای API/اسرار فرانت‌اند",
-      "priority": "critical",
-      "execution_priority": 1300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-40bc3f67-8c9b-4629-b7c8-ea7e48f6ad29.md",
-      "external_attempts": 0
-    },
     {
       "task_id": "43a3caee-fda1-4fa1-8075-35994cb49ac4",
       "title": "بررسی و به‌روزرسانی وابستگی‌های پروژه برای آسیب‌پذیری‌های امنیتی",
