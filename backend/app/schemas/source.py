@@ -288,4 +288,13 @@ __all__ = [
     "SourceRead",
     "SourceSummary",
     "SourceListResponse",
+    "SourceCredibilityResult",
+    "SourceInDB",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Cross-module compatible aliases (used by app.api.routes.sources).
+# ---------------------------------------------------------------------------
+SourceCredibilityResult = SourceCredibilityScore
+SourceInDB = SourceRead
