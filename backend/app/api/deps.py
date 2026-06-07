@@ -70,6 +70,16 @@ from app.models.user import User
 # OAuth2 / token plumbing
 # ---------------------------------------------------------------------------
 
+# JWT signing material. SECRET_KEY is a pydantic SecretStr in settings, so
+# unwrap it to the raw string for python-jose. The algorithm field is named
+# ALGORITHM in settings (HS256 by default) — NOT JWT_ALGORITHM.
+_SECRET_KEY = (
+    settings.SECRET_KEY.get_secret_value()
+    if hasattr(settings.SECRET_KEY, "get_secret_value")
+    else str(settings.SECRET_KEY)
+)
+_ALGORITHM = getattr(settings, "ALGORITHM", "HS256")
+
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_PREFIX}/auth/login",
     auto_error=True,
@@ -107,8 +117,8 @@ def _decode_token(token: str) -> dict:
     try:
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM],
+            _SECRET_KEY,
+            algorithms=[_ALGORITHM],
         )
     except (JWTError, ValidationError) as exc:  # pragma: no cover - thin wrapper
         raise CredentialsException from exc
@@ -295,4 +305,14 @@ def can_access_classification(
         return True
 
     # Build an ordering for classification levels if the enum exposes one.
-    order_f
+    order_fn = getattr(ClassificationLevel, "order", None)
+    try:
+        ordering = list(order_fn()) if callable(order_fn) else list(ClassificationLevel)
+    except Exception:  # pragma: no cover - defensive
+        ordering = []
+
+    # Conservative default-deny: roles below ADMIN/ANALYST (handled above) may
+    # access only the least-sensitive classification level.
+    if not ordering:
+        return False
+    return level == ordering[0]
