@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any, List, Optional, Union
 
 from pydantic import (
+    AliasChoices,
     AnyHttpUrl,
     Field,
     PostgresDsn,
@@ -59,23 +60,19 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     # CORS                                                               #
     # ------------------------------------------------------------------ #
-    BACKEND_CORS_ORIGINS: List[Union[AnyHttpUrl, str]] = Field(
-        default_factory=lambda: ["http://localhost:3000", "http://localhost:8000"],
-        description="Comma-separated list of origins for CORS. Can be URLs or '*'.",
+    # NOTE: pydantic-settings tries to JSON-decode env values whose field type
+    # is "complex" (e.g. List[...]) BEFORE validators run, so a plain
+    # comma-separated value like "https://a.com,https://b.com" raises a
+    # SettingsError (pydantic-settings 2.3.x has no NoDecode escape hatch). We
+    # therefore read the raw env value as a plain string and expose the parsed
+    # list through the BACKEND_CORS_ORIGINS property below.
+    BACKEND_CORS_ORIGINS_RAW: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "BACKEND_CORS_ORIGINS", "BACKEND_CORS_ORIGINS_RAW"
+        ),
+        description="Origins for CORS as a comma-separated list, a JSON array, or '*'.",
     )
-
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
-        if isinstance(v, str):
-            if v.startswith("[") and v.endswith("]"):
-                try:
-                    return json.loads(v)
-                except json.JSONDecodeError:
-                    pass
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, list):
-            return v
-        raise ValueError("Invalid format for BACKEND_CORS_ORIGINS")
 
     # ------------------------------------------------------------------ #
     # Database - PostgreSQL                                              #
@@ -84,20 +81,28 @@ class Settings(BaseSettings):
         ...,
         description="PostgreSQL database connection URL (e.g., postgresql+asyncpg://user:pass@host:port/db)",
     )
+    DATABASE_URL_SYNC: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional explicit synchronous SQLAlchemy URL (psycopg/psycopg2). "
+            "If unset, it is derived from DATABASE_URL by app.db.session."
+        ),
+    )
 
     # ------------------------------------------------------------------ #
     # Database - Neo4j (Graph Database)                                  #
     # ------------------------------------------------------------------ #
-    NEO4J_URI: str = Field(
-        ...,
-        description="Neo4j connection URI (e.g., bolt://localhost:7687)",
+    NEO4J_URI: Optional[str] = Field(
+        default=None,
+        description="Neo4j connection URI (e.g., bolt://localhost:7687). Optional: graph features are disabled if unset.",
     )
-    NEO4J_USERNAME: str = Field(
-        ...,
-        description="Neo4j database username",
+    NEO4J_USERNAME: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("NEO4J_USERNAME", "NEO4J_USER"),
+        description="Neo4j database username (accepts env NEO4J_USERNAME or NEO4J_USER)",
     )
-    NEO4J_PASSWORD: SecretStr = Field(
-        ...,
+    NEO4J_PASSWORD: Optional[SecretStr] = Field(
+        default=None,
         description="Neo4j database password",
     )
 
@@ -120,16 +125,16 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Object Storage - MinIO / S3                                        #
     # ------------------------------------------------------------------ #
-    MINIO_ENDPOINT: AnyHttpUrl = Field(
-        ...,
-        description="MinIO/S3 endpoint URL (e.g., http://localhost:9000)",
+    MINIO_ENDPOINT: Optional[AnyHttpUrl] = Field(
+        default=None,
+        description="MinIO/S3 endpoint URL (e.g., http://localhost:9000). Optional: object storage is disabled if unset.",
     )
-    MINIO_ACCESS_KEY: SecretStr = Field(
-        ...,
+    MINIO_ACCESS_KEY: Optional[SecretStr] = Field(
+        default=None,
         description="MinIO/S3 access key",
     )
-    MINIO_SECRET_KEY: SecretStr = Field(
-        ...,
+    MINIO_SECRET_KEY: Optional[SecretStr] = Field(
+        default=None,
         description="MinIO/S3 secret key",
     )
     MINIO_BUCKET_NAME: str = Field(
@@ -168,9 +173,9 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Vector Database - Qdrant                                           #
     # ------------------------------------------------------------------ #
-    QDRANT_URL: AnyHttpUrl = Field(
-        ...,
-        description="Qdrant service URL (e.g., http://localhost:6333)",
+    QDRANT_URL: Optional[AnyHttpUrl] = Field(
+        default=None,
+        description="Qdrant service URL (e.g., http://localhost:6333). Optional: vector search is disabled if unset.",
     )
     QDRANT_API_KEY: Optional[SecretStr] = Field(
         None,
@@ -206,6 +211,39 @@ class Settings(BaseSettings):
         if self.LLM_PROVIDER == "gemini" and not self.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY must be set if LLM_PROVIDER is 'gemini'")
         return self
+
+    @property
+    def SQLALCHEMY_DATABASE_URI(self) -> str:
+        """Canonical SQLAlchemy URL consumed by ``app.db.session``.
+
+        ``app.db.session`` resolves its sync/async engine URLs from
+        ``DATABASE_URL_SYNC`` / ``SQLALCHEMY_DATABASE_URI`` and normalises the
+        driver itself. Exposing this from ``DATABASE_URL`` means a single
+        ``DATABASE_URL`` env var (as provided by Render's PostgreSQL add-on)
+        is enough to wire both engines.
+        """
+        return str(self.DATABASE_URL)
+
+    @property
+    def BACKEND_CORS_ORIGINS(self) -> List[str]:
+        """Parsed list of allowed CORS origins.
+
+        Accepts a comma-separated string, a JSON array string, a single origin,
+        or ``*`` (sourced from the ``BACKEND_CORS_ORIGINS`` env var). Falls back
+        to sensible localhost defaults when unset.
+        """
+        raw = self.BACKEND_CORS_ORIGINS_RAW
+        if raw is None or not raw.strip():
+            return ["http://localhost:3000", "http://localhost:8000"]
+        raw = raw.strip()
+        if raw.startswith("[") and raw.endswith("]"):
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [str(o).strip() for o in parsed]
+            except json.JSONDecodeError:
+                pass
+        return [o.strip() for o in raw.split(",") if o.strip()]
 
 
 @lru_cache()
