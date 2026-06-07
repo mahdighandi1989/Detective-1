@@ -1,0 +1,4 @@
+# Keep the public/ directory in version control.
+# Next.js serves static assets from here, and the Dockerfile copies this
+# directory into the runtime image (`COPY --from=builder /app/public ./public`),
+# so it must exist even when empty.

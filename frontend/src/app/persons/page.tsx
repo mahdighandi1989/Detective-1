@@ -281,4 +281,182 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       <p className="mt-1 max-w-md text-xs text-red-400/80">{message}</p>
       <button
         onClick={onRetry}
-        className="mt-4 rounded
+        className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/20"
+      >
+        تلاش مجدد
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+const RISK_ORDER: RiskCategory[] = [
+  'infiltrator',
+  'suspect',
+  'transformed',
+  'clean',
+  'unknown',
+];
+
+const RISK_FILTERS: Array<{ value: RiskCategory | 'all'; label: string }> = [
+  { value: 'all', label: 'همه' },
+  ...RISK_ORDER.map((value) => ({ value, label: RISK_META[value].label })),
+];
+
+export default function PersonsPage() {
+  const [persons, setPersons] = useState<PersonSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [riskFilter, setRiskFilter] = useState<RiskCategory | 'all'>('all');
+
+  const loadPersons = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = getToken();
+      const res = await fetch(
+        `${API_BASE}/api/v1/persons?page=1&page_size=100`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        },
+      );
+      if (!res.ok) {
+        throw new Error(`خطای سرور: ${res.status}`);
+      }
+      const data: PersonListResponse | PersonSummary[] = await res.json();
+      const items = Array.isArray(data) ? data : data.items ?? [];
+      setPersons(items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'اتصال به سرور برقرار نشد.');
+      setPersons([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPersons();
+  }, [loadPersons]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return persons
+      .filter((p) =>
+        riskFilter === 'all' ? true : p.risk_category === riskFilter,
+      )
+      .filter((p) => {
+        if (!q) return true;
+        const haystack = [
+          p.full_name,
+          p.current_position ?? '',
+          p.current_organization ?? '',
+          ...p.aliases,
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      })
+      .sort(
+        (a, b) =>
+          (RISK_META[a.risk_category]?.order ?? 99) -
+            (RISK_META[b.risk_category]?.order ?? 99) ||
+          b.risk_score - a.risk_score,
+      );
+  }, [persons, query, riskFilter]);
+
+  const hasFilters = query.trim().length > 0 || riskFilter !== 'all';
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100" dir="rtl">
+      <div className="mx-auto max-w-7xl px-4 py-6">
+        {/* Header */}
+        <div className="mb-6 flex flex-col gap-4 border-b border-slate-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-50">اشخاص</h1>
+            <p className="mt-1 text-sm text-slate-400">
+              پروفایل‌های شناسایی‌شده به همراه سطح خطر و سوابق.
+              {!loading && !error && (
+                <span className="ml-1 text-slate-500">
+                  ({filtered.length.toLocaleString('fa-IR')} نتیجه)
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/graph"
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800"
+            >
+              نمودار ارتباطی
+            </Link>
+            <Link
+              href="/persons/new"
+              className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500"
+            >
+              + افزودن شخص
+            </Link>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative w-full lg:max-w-sm">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="جستجو بر اساس نام، سمت یا سازمان…"
+              className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 pl-9 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-1 focus:ring-cyan-600"
+            />
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
+              🔍
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {RISK_FILTERS.map((f) => {
+              const active = riskFilter === f.value;
+              return (
+                <button
+                  key={f.value}
+                  onClick={() => setRiskFilter(f.value)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    active
+                      ? 'border-cyan-500/50 bg-cyan-500/15 text-cyan-300'
+                      : 'border-slate-800 bg-slate-900 text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {loading ? (
+            Array.from({ length: 8 }).map((_, i) => (
+              <PersonCardSkeleton key={i} />
+            ))
+          ) : error ? (
+            <ErrorState message={error} onRetry={loadPersons} />
+          ) : filtered.length === 0 ? (
+            <EmptyState hasFilters={hasFilters} />
+          ) : (
+            filtered.map((person) => (
+              <PersonCard key={person.id} person={person} />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
