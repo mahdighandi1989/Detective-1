@@ -1,0 +1,213 @@
+# ===== Python / FastAPI Backend =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre / Pytype
+.pyre/
+.pytype/
+
+# Ruff
+.ruff_cache/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# ===== Environment / Secrets =====
+.env
+.env.*
+!.env.example
+!.env.sample
+*.local
+secrets.json
+*.pem
+*.key
+
+# ===== Node.js / Next.js Frontend =====
+node_modules/
+.npm
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# Production
+/build
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing (Vitest / Jest / Playwright)
+coverage/
+.nyc_output/
+playwright-report/
+playwright/.cache/
+test-results/
+
+# ===== Logs =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===== Databases (local) =====
+*.sqlite3
+*.sqlite
+*.db
+postgres-data/
+pgdata/
+neo4j-data/
+neo4j/data/
+neo4j/logs/
+neo4j/import/
+neo4j/plugins/
+
+# ===== Vector stores (Qdrant local) =====
+qdrant_storage/
+
+# ===== Redis =====
+dump.rdb
+*.rdb
+
+# ===== MinIO / S3 (local storage) =====
+minio-data/
+storage/
+uploads/
+media/
+
+# ===== Alembic (keep migrations, ignore temp) =====
+# Migrations are tracked; nothing ignored here intentionally.
+
+# ===== Docker =====
+docker-compose.override.yml
+.docker/
+
+# ===== IDE / Editor =====
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# ===== OS =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===== Misc / Temp =====
+*.bak
+*.tmp
+*.temp
+tmp/
+temp/
+.cache/
+
+# ===== Model / ML artifacts (large) =====
+*.bin
+*.gguf
+*.onnx
+models/local/
+
+# ===== TO-DO index is tracked (do NOT ignore) =====
+!TO-DO/
+!TO-DO/**
+```
+
+این فایل `.gitignore` برای پروژهٔ Detective-1 ساخته شد و هر دو tier را پوشش می‌دهد:
+
+- **backend (FastAPI/Python):** `__pycache__`, `.venv`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, Celery state
+- **frontend (Next.js/TS):** `node_modules`, `.next`, `out`, `*.tsbuildinfo`, `next-env.d.ts`, Vitest/Playwright artifacts
+- **databases/infra:** PostgreSQL (`pgdata`), Neo4j data, Qdrant storage, Redis dump, MinIO/S3 local storage
+- **secrets/env:** همهٔ `.env*` ignore شده ولی `.env.example`/`.env.sample` صریحاً tracked نگه داشته شده
+- **migrations:** Alembic عمداً ignore **نشده** تا tracked بماند
+- **TO-DO:** صریحاً un-ignore شده تا index و فایل‌های TO-DO حفظ شوند
+
+**Dependencies synced:**
+- upstream: هیچ — این فایل foundational است
+- downstream: بررسی شد — هیچ کدی به `.gitignore` reference نمی‌دهد
+- cross-tier (backend↔frontend↔db↔infra): همگام شد — هر چهار لایه (Python, Node, DB volumes, Docker) در patterns پوشش داده شد
+- side artifacts: بررسی شد — هیچ docs/test/config دیگری نیاز به تغییر همزمان ندارد
+
+**TO-DO:** بررسی شد — این تسک هیچ بخش Manual-required ندارد، TO-DO ساخته نشد.
