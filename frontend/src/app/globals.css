@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    /* Risk level colors (light) */
+    --risk-clean: 142 71% 45%;
+    --risk-suspicious: 38 92% 50%;
+    --risk-infiltrator: 0 84% 60%;
+    --risk-degenerated: 271 76% 53%;
+    --risk-unknown: 215 16% 47%;
+
+    /* Classification levels */
+    --classification-public: 142 71% 45%;
+    --classification-restricted: 38 92% 50%;
+    --classification-confidential: 25 95% 53%;
+    --classification-secret: 0 84% 60%;
+    --classification-topsecret: 0 72% 41%;
+
+    /* Chart / graph */
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+
+    /* Risk level colors (dark) */
+    --risk-clean: 142 69% 58%;
+    --risk-suspicious: 38 92% 58%;
+    --risk-infiltrator: 0 84% 65%;
+    --risk-degenerated: 271 81% 66%;
+    --risk-unknown: 215 20% 65%;
+
+    /* Classification levels (dark) */
+    --classification-public: 142 69% 58%;
+    --classification-restricted: 38 92% 58%;
+    --classification-confidential: 25 95% 60%;
+    --classification-secret: 0 84% 65%;
+    --classification-topsecret: 0 72% 51%;
+
+    /* Chart / graph (dark) */
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  /* RTL support for Persian content */
+  [dir="rtl"] {
+    text-align: right;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Risk level badge utilities */
+  .risk-clean {
+    color: hsl(var(--risk-clean));
+    background-color: hsl(var(--risk-clean) / 0.1);
+    border-color: hsl(var(--risk-clean) / 0.3);
+  }
+
+  .risk-suspicious {
+    color: hsl(var(--risk-suspicious));
+    background-color: hsl(var(--risk-suspicious) / 0.1);
+    border-color: hsl(var(--risk-suspicious) / 0.3);
+  }
+
+  .risk-infiltrator {
+    color: hsl(var(--risk-infiltrator));
+    background-color: hsl(var(--risk-infiltrator) / 0.1);
+    border-color: hsl(var(--risk-infiltrator) / 0.3);
+  }
+
+  .risk-degenerated {
+    color: hsl(var(--risk-degenerated));
+    background-color: hsl(var(--risk-degenerated) / 0.1);
+    border-color: hsl(var(--risk-degenerated) / 0.3);
+  }
+
+  .risk-unknown {
+    color: hsl(var(--risk-unknown));
+    background-color: hsl(var(--risk-unknown) / 0.1);
+    border-color: hsl(var(--risk-unknown) / 0.3);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.4);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.6);
+}
+
+/* React Flow overrides for risk-based node coloring */
+.react-flow__node {
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.react-flow__edge-path {
+  stroke: hsl(var(--muted-foreground) / 0.5);
+}
+
+.react-flow__controls {
+  box-shadow: 0 0 8px hsl(var(--foreground) / 0.1);
+}
+
+.react-flow__controls-button {
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+
+.react-flow__controls-button:hover {
+  background: hsl(var(--accent));
+}
+
+.react-flow__attribution {
+  background: transparent;
+}
+
+/* Cytoscape container */
+.cytoscape-container {
+  width: 100%;
+  height: 100%;
+  background: hsl(var(--background));
+}
