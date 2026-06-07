@@ -212,3 +212,11 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached application settings."""
     return Settings()
+
+
+# Module-level settings instance. The application imports this object directly
+# (``from app.core.config import settings``) from many modules — including the
+# FastAPI entrypoint and the Celery worker — and treats its absence as a
+# fail-fast wiring error. It is built through the cached factory above so the
+# entire process shares a single, validated Settings object.
+settings = get_settings()
