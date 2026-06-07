@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/Detective-1",
   "watched_id": "da869845-ceca-4630-a640-722ae9a7842d",
-  "total": 3,
+  "total": 4,
   "tasks": [
     {
       "task_id": "40bc3f67-8c9b-4629-b7c8-ea7e48f6ad29",
@@ -22,6 +22,16 @@
       "status": "awaiting_review",
       "external_status": "pending",
       "path": "prompt/task-43a3caee-fda1-4fa1-8075-35994cb49ac4.md",
+      "external_attempts": 0
+    },
+    {
+      "task_id": "4a99f60b-a89b-40e4-9542-1850da58e336",
+      "title": "افزودن تست‌های تأیید RBAC برای نقاط پایانی API",
+      "priority": "critical",
+      "execution_priority": 1300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-4a99f60b-a89b-40e4-9542-1850da58e336.md",
       "external_attempts": 0
     },
     {
