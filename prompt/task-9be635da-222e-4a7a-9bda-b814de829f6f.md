@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: da869845-ceca-4630-a640-722ae9a7842d
 project: mahdighandi1989/Detective-1
 created_at: '2026-06-13T17:59:49.085195+00:00'
-updated_at: '2026-06-13T17:59:49.085197+00:00'
+updated_at: '2026-06-13T20:16:35.223657+00:00'
 target_files:
 - backend/app/api/routes/risk_assessment.py
 ---
@@ -493,6 +493,6 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. The `backend/app/api/routes/risk_assessment.py` module imports all its core dependencies directly without `try/except` fallbacks.
-2. If a core dependency is missing, the application fails to start with a clear `ImportError`.
-3. Authentication and authorization for risk assessment endpoints function as intended.
+1. The `backend/app/api/routes/risk_assessment.py` module imports all its core dependencies directly without `try/except` fallbacks. _(verify: static)_
+2. If a core dependency is missing, the application fails to start with a clear `ImportError`. _(verify: static)_
+3. Authentication and authorization for risk assessment endpoints function as intended. _(verify: static)_
